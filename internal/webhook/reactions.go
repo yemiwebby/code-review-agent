@@ -19,10 +19,18 @@ type ReactionsResponse struct {
 
 func CheckReactionsHandler(w http.ResponseWriter, r *http.Request) {
 	repo := r.URL.Query().Get("repo")
+
+	github.Mu.Lock()
+	if len(github.AIComments) == 0 {
+		github.Mu.Unlock()
+		http.Error(w, "No AI review comments found. Please ensure the AI agent has reviewed your PR before merging.", http.StatusPreconditionFailed)
+		return
+	}
+	github.Mu.Unlock()
+
 	commentIDStr := r.URL.Query().Get("comment_id")
 
 	res := ValidateReactionsParams(repo, commentIDStr)
-
 	if res.Err != nil {
 		http.Error(w, res.Err.Error(), res.Status)
 		return
