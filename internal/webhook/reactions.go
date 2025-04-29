@@ -19,34 +19,34 @@ type ReactionsResponse struct {
 
 func CheckReactionsHandler(w http.ResponseWriter, r *http.Request) {
 	repo := r.URL.Query().Get("repo")
+	if repo == "" {
+		http.Error(w, "Missing 'repo' query parameter", http.StatusBadRequest)
+		return
+	}
 
 	github.Mu.Lock()
+	defer github.Mu.Unlock()
+
 	if len(github.AIComments) == 0 {
-		github.Mu.Unlock()
-		http.Error(w, "No AI review comments found. Please ensure the AI agent has reviewed your PR before merging.", http.StatusPreconditionFailed)
-		return
-	}
-	github.Mu.Unlock()
-
-	commentIDStr := r.URL.Query().Get("comment_id")
-
-	res := ValidateReactionsParams(repo, commentIDStr)
-	if res.Err != nil {
-		http.Error(w, res.Err.Error(), res.Status)
+		http.Error(w, "No AI review comments found. Ensure AI agent has reviewed the PR.", http.StatusPreconditionFailed)
 		return
 	}
 
-	up, down, err := github.FetchReactions(repo, res.CommentID)
-	if err != nil {
-		http.Error(w, "Failed to fetch reactions: "+err.Error(), http.StatusInternalServerError)
-		return
+	for id := range github.AIComments {
+		up, down, err := github.FetchReactions(repo, id)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to fetch reactions for comment %d: %v", id, err), http.StatusInternalServerError)
+			return
+		}
+
+		if up == 0 && down == 0 {
+			http.Error(w, fmt.Sprintf("No reaction found for comment ID %d", id), http.StatusPreconditionFailed)
+			return
+		}
+
 	}
 
-	if up > 0 || down > 0 {
-		fmt.Fprintln(w, "Reaction detected.")
-	} else {
-		http.Error(w, "No reaction found", http.StatusPreconditionFailed)
-	}
+	fmt.Fprintln(w, "All AI review comments have been acknowledged (reacted).")
 }
 
 func ProcessReactions(w http.ResponseWriter, r *http.Request) {
