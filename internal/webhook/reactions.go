@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/yemiwebby/code-review-agent/internal/github"
 	"github.com/yemiwebby/code-review-agent/internal/openai"
 )
+
+const reactionGracePeriod = 30 * time.Second
 
 type ReactionsResponse struct {
 	CommentID int
@@ -32,21 +35,54 @@ func CheckReactionsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for id := range github.AIComments {
+	var total int
+	var enforced int
+	var acknowledged int
+	now := time.Now()
+
+	for id, comment := range github.AIComments {
+		total++
+
+		if now.Sub(comment.Timestamp) < reactionGracePeriod {
+			fmt.Printf("Skipping recent comment %d (%s ago)\n", id, now.Sub(comment.Timestamp).Round(time.Second))
+			continue
+		}
+
+		if comment.OldPatch == "" {
+			fmt.Printf("Skipping comment %d due to missing OldPatch\n", id)
+			continue
+		}
+
 		up, down, err := github.FetchReactions(repo, id)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to fetch reactions for comment %d: %v", id, err), http.StatusInternalServerError)
 			return
 		}
 
-		if up == 0 && down == 0 {
-			http.Error(w, fmt.Sprintf("No reaction found for comment ID %d", id), http.StatusPreconditionFailed)
-			return
-		}
+		enforced++
 
+		if up > 0 || down > 0 {
+			acknowledged++
+		} else {
+			fmt.Printf("No reaction on comment %d (%s)\n", id, comment.File)
+		}
 	}
 
-	fmt.Fprintln(w, "All AI review comments have been acknowledged (reacted).")
+	if enforced == 0 {
+		http.Error(w, "No eligible comments found for enforcement yet. Try again ;ater", http.StatusPreconditionFailed)
+		return
+	}
+
+	if acknowledged == 0 {
+		http.Error(w, fmt.Sprintf("No reactions found on %d enforced comment(s).", enforced), http.StatusPreconditionFailed)
+	}
+
+	if acknowledged == 0 {
+		http.Error(w, fmt.Sprintf("No reactions found on %d enforced comment(s).", enforced), http.StatusPreconditionFailed)
+		return
+	}
+
+	fmt.Fprintln(w, "Enforced AI comments have been acknowledged with a reaction.\n", acknowledged, enforced)
 }
 
 func ProcessReactions(w http.ResponseWriter, r *http.Request) {

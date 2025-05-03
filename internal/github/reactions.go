@@ -23,16 +23,20 @@ func FetchReactions(repo string, commentID int) (int, int, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
 
-	// Then decode into slice
+	if resp.StatusCode != http.StatusOK {
+		return 0, 0, fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
 	var reactions []Reactions
 	if err := json.Unmarshal(body, &reactions); err != nil {
-		return 0, 0, err
+		fmt.Println("⚠️ Raw GitHub response (unexpected structure):", string(body)) // Debugging aid
+		return 0, 0, fmt.Errorf("failed to decode reactions JSON: %w", err)
 	}
 
 	upvotes, downvotes := 0, 0
@@ -44,5 +48,6 @@ func FetchReactions(repo string, commentID int) (int, int, error) {
 			downvotes++
 		}
 	}
+
 	return upvotes, downvotes, nil
 }
