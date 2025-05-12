@@ -17,6 +17,7 @@ func main() {
 		fmt.Fprintf(w, "AI PR Review Agent is running")
 	})
 	mux.HandleFunc("/webhook", webhook.Handle)
+	mux.HandleFunc("/github-app", webhook.GithubAppHandler)
 	mux.HandleFunc("/process-reaction", webhook.ProcessReactions)
 	mux.HandleFunc("/check-reactions", webhook.CheckReactionsHandler)
 
