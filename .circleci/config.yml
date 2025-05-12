@@ -4,7 +4,7 @@ executors:
   go-executor:
     docker:
       - image: cimg/go:1.24.2
-    working_directory: ~/code-review-agent
+    working_directory: ~/project
 
 jobs:
   build-and-test:
