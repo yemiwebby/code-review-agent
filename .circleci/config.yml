@@ -22,7 +22,7 @@ jobs:
 
       - run:
           name: Build Application
-          command: go build -o code-review-agent
+          command: cd cmd && go build -o ../code-review-agent
 
       - run:
           name: Archive Build (Optional)
