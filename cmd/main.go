@@ -20,6 +20,9 @@ func main() {
 	mux.HandleFunc("/process-reaction", webhook.ProcessReactions)
 	mux.HandleFunc("/check-reactions", webhook.CheckReactionsHandler)
 
-	fmt.Println("Server running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	log.Println("Starting server on port 8080")
+	if err := http.ListenAndServe(":8080", mux); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
+
 }
