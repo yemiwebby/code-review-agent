@@ -49,7 +49,7 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authenticator, err := github.NewAppAuthenticator(config.GithubAppId, config.GithubPrivateKeyPath)
+	authenticator, err := github.NewAppAuthenticator(config.GithubAppId)
 	if err != nil {
 		log.Printf("Error getting installation token: %v", err)
 		http.Error(w, "Failed to initialize authenticator", http.StatusInternalServerError)

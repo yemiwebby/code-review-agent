@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	GithubToken, OpenaiApiKey, GithubAppId, GithubPrivateKeyPath, GithubWebhookSecret, OwnerUsername, Repo, PrNumber string
+	GithubToken, OpenaiApiKey, GithubAppId, GithubPrivateKey, GithubWebhookSecret, OwnerUsername, Repo, PrNumber string
 )
 
 func LoadEnv() {
@@ -20,7 +20,7 @@ func LoadEnv() {
 	GithubToken = os.Getenv("GITHUB_TOKEN")
 	OpenaiApiKey = os.Getenv("OPENAI_API_KEY")
 	GithubAppId = os.Getenv("GITHUB_APP_ID")
-	GithubPrivateKeyPath = os.Getenv("GITHUB_PRIVATE_KEY_PATH")
+	GithubPrivateKey = os.Getenv("GITHUB_PRIVATE_KEY")
 	GithubWebhookSecret = os.Getenv("GITHUB_WEBHOOK_SECRET")
 	OwnerUsername = os.Getenv("OWNER_USERNAME")
 	Repo = os.Getenv("REPO")
