@@ -1,0 +1,38 @@
+version: 2.1
+
+executors:
+  go-executor:
+    docker:
+      - image: cimg/go:1.24.2
+    working_directory: ~/project
+
+jobs:
+  build-and-test:
+    executor: go-executor
+    steps:
+      - checkout
+
+      - run:
+          name: Install Dependencies
+          command: go mod tidy
+
+      - run:
+          name: Run Tests
+          command: go test ./... -v
+
+      - run:
+          name: Build Application
+          command: cd cmd && go build -o ../code-review-agent
+
+      - run:
+          name: Archive Build (Optional)
+          command: |
+            mkdir -p artifacts
+            mv code-review-agent artifacts/
+            ls -la artifacts/
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - build-and-test
