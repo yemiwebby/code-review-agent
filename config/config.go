@@ -13,9 +13,6 @@ var (
 	GithubAppId         string
 	GithubPrivateKey    string
 	GithubWebhookSecret string
-	OwnerUsername       string
-	Repo                string
-	PrNumber            string
 )
 
 func LoadEnv() {
@@ -37,11 +34,8 @@ func LoadEnv() {
 	GithubAppId = os.Getenv("GITHUB_APP_ID")
 	GithubPrivateKey = os.Getenv("GITHUB_PRIVATE_KEY")
 	GithubWebhookSecret = os.Getenv("GITHUB_WEBHOOK_SECRET")
-	OwnerUsername = os.Getenv("OWNER_USERNAME")
-	Repo = os.Getenv("REPO")
-	PrNumber = os.Getenv("PR_NUMBER")
 
 	// Log for visibility
-	log.Printf("Environment variables loaded: GITHUB_APP_ID=%s, OWNER_USERNAME=%s, REPO=%s, PR_NUMBER=%s",
-		GithubAppId, OwnerUsername, Repo, PrNumber)
+	log.Printf("Environment variables loaded: GITHUB_APP_ID=%s",
+		GithubAppId)
 }
