@@ -27,6 +27,8 @@ type PullRequestPayload struct {
 }
 
 func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Received GitHub App webhook")
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -79,7 +81,7 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 	prNumber := payload.PullRequest.Number
 
 	// Log the extracted PR info
-	log.Printf("Processing PR #%d in %s by %s", prNumber, repo, owner)
+	log.Printf("Extracted PR info: owner=%s, repo=%s, prNumber=%d", owner, repo, prNumber)
 
 	// Authenticate with GitHub
 	authenticator, err := github.NewAppAuthenticator(config.GithubAppId)
@@ -99,6 +101,8 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 	// Post a dynamic comment to the PR
 	client := github.NewGitHubClient(token)
 	comment := fmt.Sprintf("Hello from your GitHub App! (PR #%d in %s)", prNumber, repo)
+	log.Printf("Posting comment: %s", comment)
+
 	err = client.PostComment(owner, repo, prNumber, comment)
 	if err != nil {
 		log.Printf("Error posting comment: %v", err)
@@ -108,4 +112,5 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintln(w, "Comment posted successfully")
+	log.Println("Comment posted successfully")
 }
