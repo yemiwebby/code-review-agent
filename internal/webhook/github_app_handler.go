@@ -78,6 +78,9 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 	repo := payload.Repository.FullName
 	prNumber := payload.PullRequest.Number
 
+	// Log the extracted PR info
+	log.Printf("Processing PR #%d in %s by %s", prNumber, repo, owner)
+
 	// Authenticate with GitHub
 	authenticator, err := github.NewAppAuthenticator(config.GithubAppId)
 	if err != nil {
