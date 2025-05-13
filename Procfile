@@ -1,1 +1,1 @@
-web: ./bootstrap
+web: bin/bootstrap
