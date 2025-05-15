@@ -69,19 +69,23 @@ func (c *GitHubAppClient) PostReviewComment(owner, repo string, prNumber int, bo
 	var result struct {
 		ID int `json:"id"`
 	}
-	json.Unmarshal(respBody, &result)
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return fmt.Errorf("failed to parse comment ID from response: %w", err)
+	}
 
 	// Store the comment for future reference
 	Mu.Lock()
 	defer Mu.Unlock()
-	AIComments[result.ID] = &AIComment{
-		ID:        result.ID,
-		Body:      body,
-		File:      file,
-		Timestamp: time.Now(),
-		Line:      line,
-		FilePath:  file,
-		OldPatch:  patch,
+	if _, exists := AIComments[result.ID]; !exists {
+		AIComments[result.ID] = &AIComment{
+			ID:        result.ID,
+			Body:      body,
+			File:      file,
+			Timestamp: time.Now(),
+			Line:      line,
+			FilePath:  file,
+			OldPatch:  patch,
+		}
 	}
 
 	fmt.Printf("Posted review comment for %s: %s (ID: %d)\n", file, body, result.ID)
