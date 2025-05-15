@@ -74,11 +74,12 @@ func (c *GitHubAppClient) PostReviewComment(owner, repo string, prNumber int, bo
 	}
 
 	// Store the comment for future reference
+	commentID := result.ID
 	Mu.Lock()
 	defer Mu.Unlock()
-	if _, exists := AIComments[result.ID]; !exists {
-		AIComments[result.ID] = &AIComment{
-			ID:        result.ID,
+	if _, exists := AIComments[commentID]; !exists {
+		AIComments[commentID] = &AIComment{
+			ID:        commentID,
 			Body:      body,
 			File:      file,
 			Timestamp: time.Now(),
