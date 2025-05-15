@@ -34,7 +34,9 @@ func NewGitHubAppClient(token string) *GitHubAppClient {
 }
 
 func (c *GitHubAppClient) PostReviewComment(owner, repo string, prNumber int, body, file string, line int, patch string) error {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/comments", owner, repo, prNumber)
+	// url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/comments", owner, repo, prNumber)
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", owner, repo, prNumber)
+
 	payload, err := json.Marshal(map[string]string{"body": body})
 	if err != nil {
 		return fmt.Errorf("failed to marshal comment data: %w", err)

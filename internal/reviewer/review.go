@@ -10,7 +10,7 @@ import (
 )
 
 func ReviewPullRequest(owner, repo string, prNumber int) {
-	fmt.Printf("Reviewing PR #%d in %s'/'%s\n", prNumber, owner, repo)
+	fmt.Printf("Reviewing PR #%d in %s/%s\n", prNumber, owner, repo)
 
 	files, err := github.GetPRFiles(owner, repo, prNumber)
 	if err != nil {
