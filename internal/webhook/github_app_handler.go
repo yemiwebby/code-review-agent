@@ -80,6 +80,11 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 	repo := payload.Repository.FullName
 	prNumber := payload.PullRequest.Number
 
+	// extract the actual repo name (without the owner prefix)
+	if slashIndex := len(owner) + 1; slashIndex < len(repo) && repo[slashIndex-1] == '/' {
+		repo = repo[slashIndex:]
+	}
+
 	// Log the extracted PR info
 	log.Printf("Extracted PR info: owner=%s, repo=%s, prNumber=%d", owner, repo, prNumber)
 
