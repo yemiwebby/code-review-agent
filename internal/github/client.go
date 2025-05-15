@@ -9,11 +9,6 @@ import (
 	"github.com/yemiwebby/code-review-agent/config"
 )
 
-type FileChange struct {
-	Filename string `json:"filename"`
-	Patch    string `json:"patch"`
-}
-
 var GitHubBaseURL = "https://api.github.com"
 
 func GetPRFiles(owner, repo string, prNumber int) ([]FileChange, error) {

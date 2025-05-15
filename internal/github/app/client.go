@@ -6,24 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
-	"time"
-)
 
-var (
-	Mu         = &sync.Mutex{}
-	AIComments = map[int]*AIComment{}
+	"github.com/yemiwebby/code-review-agent/internal/comment"
 )
-
-type AIComment struct {
-	ID        int
-	Body      string
-	File      string
-	Timestamp time.Time
-	Line      int
-	FilePath  string
-	OldPatch  string
-}
 
 type GitHubAppClient struct {
 	Token string
@@ -33,16 +18,22 @@ func NewGitHubAppClient(token string) *GitHubAppClient {
 	return &GitHubAppClient{Token: token}
 }
 
-func (c *GitHubAppClient) PostReviewComment(owner, repo string, prNumber int, body, file string, line int, patch string) error {
-	// url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/comments", owner, repo, prNumber)
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", owner, repo, prNumber)
+func (c *GitHubAppClient) PostReviewComment(owner, repo string, prNumber int, body, file, commitID string, line int, patch string) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/comments", owner, repo, prNumber)
 
-	payload, err := json.Marshal(map[string]string{"body": body})
+	payload := map[string]interface{}{
+		"body":      body,
+		"commit_id": commitID,
+		"path":      file,
+		"positon":   line,
+	}
+
+	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal comment data: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -77,20 +68,8 @@ func (c *GitHubAppClient) PostReviewComment(owner, repo string, prNumber int, bo
 
 	// Store the comment for future reference
 	commentID := result.ID
-	Mu.Lock()
-	defer Mu.Unlock()
-	if _, exists := AIComments[commentID]; !exists {
-		AIComments[commentID] = &AIComment{
-			ID:        commentID,
-			Body:      body,
-			File:      file,
-			Timestamp: time.Now(),
-			Line:      line,
-			FilePath:  file,
-			OldPatch:  patch,
-		}
-	}
+	comment.StoreComment(commentID, body, file, line, patch)
 
-	fmt.Printf("Posted review comment for %s: %s (ID: %d)\n", file, body, result.ID)
+	fmt.Printf("Posted review comment for %s: %s (ID: %d)\n", file, body, commentID)
 	return nil
 }

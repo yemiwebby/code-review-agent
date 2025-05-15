@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/yemiwebby/code-review-agent/internal/comment"
 	"github.com/yemiwebby/code-review-agent/internal/github"
-	"github.com/yemiwebby/code-review-agent/internal/github/directwebhook"
 	"github.com/yemiwebby/code-review-agent/internal/openai"
 )
 
@@ -16,7 +16,7 @@ const reactionGracePeriod = 30 * time.Second
 
 type ReactionsResponse struct {
 	CommentID int
-	Comment   *directwebhook.AIComment
+	Comment   *comment.AIComment
 	Status    int
 	Err       error
 }
@@ -28,10 +28,10 @@ func CheckReactionsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	directwebhook.Mu.Lock()
-	defer directwebhook.Mu.Unlock()
+	comment.Mu.Lock()
+	defer comment.Mu.Unlock()
 
-	if len(directwebhook.AIComments) == 0 {
+	if len(comment.AIComments) == 0 {
 		http.Error(w, "No AI review comments found. Ensure AI agent has reviewed the PR.", http.StatusPreconditionFailed)
 		return
 	}
@@ -41,7 +41,7 @@ func CheckReactionsHandler(w http.ResponseWriter, r *http.Request) {
 	var acknowledged int
 	now := time.Now()
 
-	for id, comment := range directwebhook.AIComments {
+	for id, comment := range comment.AIComments {
 		total++
 
 		if now.Sub(comment.Timestamp) < reactionGracePeriod {
@@ -119,9 +119,13 @@ func ValidateReactionsParams(repo, commentIDStr string) ReactionsResponse {
 		return NewReactionsErr(http.StatusBadRequest, errors.New("invalid comment_id"))
 	}
 
-	directwebhook.Mu.Lock()
-	comment, ok := directwebhook.AIComments[commentID]
-	directwebhook.Mu.Unlock()
+	comment.Mu.Lock()
+	defer comment.Mu.Unlock()
+
+	comment, ok := comment.AIComments[commentID]
+	if !ok {
+		return NewReactionsErr(http.StatusNotFound, errors.New("comment not found in memory"))
+	}
 
 	if !ok {
 		return NewReactionsErr(http.StatusNotFound, errors.New("comment not found in memory"))

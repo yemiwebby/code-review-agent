@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/yemiwebby/code-review-agent/internal/github"
 	"github.com/yemiwebby/code-review-agent/internal/github/directwebhook"
 )
 
@@ -13,6 +14,9 @@ func TestPostReviewCommentRace(t *testing.T) {
 	var wg sync.WaitGroup
 	concurrency := 10
 
+	// Use the CommentPoster interface for flexibility
+	var client github.GithubClientInterface = &directwebhook.GithubClient{}
+
 	wg.Add(concurrency)
 
 	for i := 0; i < concurrency; i++ {
@@ -21,12 +25,15 @@ func TestPostReviewCommentRace(t *testing.T) {
 			owner := "dummy"
 			repo := "repo"
 			pr := 1
-			comment := "simualted AI comment"
-			file := "file"
+			comment := "simulated AI comment"
+			file := "file.go"
 			line := 2
 			oldPatch := "old Patch"
 
-			directwebhook.PostReviewComment(owner, repo, pr, comment, file, line, oldPatch)
+			err := client.PostReviewComment(owner, repo, pr, comment, file, "", line, oldPatch)
+			if err != nil {
+				t.Errorf("Failed to post review comment: %v", err)
+			}
 		}(i)
 	}
 

@@ -6,33 +6,40 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
-	"time"
 
-	"github.com/yemiwebby/code-review-agent/config"
+	"github.com/yemiwebby/code-review-agent/internal/comment"
 )
 
-var (
-	Mu         = &sync.Mutex{}
-	AIComments = map[int]*AIComment{}
-)
-
-type AIComment struct {
-	ID        int
-	Body      string
-	File      string
-	Timestamp time.Time
-	Line      int
-	FilePath  string
-	OldPatch  string
+type GithubClient struct {
+	Token string
 }
 
-func PostReviewComment(owner, repo string, prNumber int, body, file string, line int, patch string) error {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", owner, repo, prNumber)
-	payload, _ := json.Marshal(map[string]string{"body": body})
+func NewGitHubClient(token string) *GithubClient {
+	return &GithubClient{Token: token}
+}
 
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
-	req.Header.Set("Authorization", "token "+config.GithubToken)
+func (c *GithubClient) PostReviewComment(owner, repo string, prNumber int, body, file, commitID string, line int, patch string) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/comments", owner, repo, prNumber)
+
+	payload := map[string]interface{}{
+		"body":      body,
+		"commit_id": commitID,
+		"path":      file,
+		"position":  line,
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal comment data: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "token "+c.Token)
+	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
@@ -54,20 +61,13 @@ func PostReviewComment(owner, repo string, prNumber int, body, file string, line
 	var result struct {
 		ID int `json:"id"`
 	}
-	json.Unmarshal(respBody, &result)
-
-	Mu.Lock()
-	defer Mu.Unlock()
-	AIComments[result.ID] = &AIComment{
-		ID:        result.ID,
-		Body:      body,
-		File:      file,
-		Timestamp: time.Now(),
-		Line:      line,
-		FilePath:  file,
-		OldPatch:  patch,
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return fmt.Errorf("failed to parse comment ID from response: %w", err)
 	}
 
-	fmt.Printf("Posted review comment for %s: %s (ID: %d)\n", file, body, result.ID)
+	commentID := result.ID
+	comment.StoreComment(commentID, body, file, line, patch)
+
+	fmt.Printf("Posted review comment for %s: %s (ID: %d)\n", file, body, commentID)
 	return nil
 }

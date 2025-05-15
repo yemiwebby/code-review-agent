@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yemiwebby/code-review-agent/internal/comment"
 	"github.com/yemiwebby/code-review-agent/internal/github"
-	"github.com/yemiwebby/code-review-agent/internal/github/directwebhook"
 	"github.com/yemiwebby/code-review-agent/internal/openai"
 )
 
-func ReviewPullRequest(owner, repo string, prNumber int) {
+func ReviewPullRequest(owner, repo string, prNumber int, commitID string, client github.GithubClientInterface) {
 	fmt.Printf("Reviewing PR #%d in %s/%s\n", prNumber, owner, repo)
 
 	files, err := github.GetPRFiles(owner, repo, prNumber)
@@ -18,11 +18,11 @@ func ReviewPullRequest(owner, repo string, prNumber int) {
 		return
 	}
 
-	analyzeAndPostComments(files, owner, repo, prNumber)
+	analyzeAndPostComments(files, owner, repo, prNumber, commitID, client)
 	processCommentReactions(owner, repo, prNumber)
 }
 
-func analyzeAndPostComments(files []github.FileChange, owner, repo string, prNumber int) {
+func analyzeAndPostComments(files []github.FileChange, owner, repo string, prNumber int, commitID string, client github.GithubClientInterface) {
 	for _, file := range files {
 		if file.Patch == "" {
 			continue
@@ -41,7 +41,7 @@ func analyzeAndPostComments(files []github.FileChange, owner, repo string, prNum
 
 		comment := fmt.Sprintf("**File:** %s:\n%s\n\n", file.Filename, review)
 
-		err = directwebhook.PostReviewComment(owner, repo, prNumber, comment, file.Filename, 0, file.Patch)
+		err = client.PostReviewComment(owner, repo, prNumber, comment, file.Filename, commitID, 1, file.Patch)
 		if err != nil {
 			fmt.Println("Failed to post comment:", err)
 		}
@@ -49,10 +49,11 @@ func analyzeAndPostComments(files []github.FileChange, owner, repo string, prNum
 }
 
 func processCommentReactions(owner, repo string, prNumber int) {
-	directwebhook.Mu.Lock()
-	defer directwebhook.Mu.Unlock()
 
-	for id, aiComment := range directwebhook.AIComments {
+	comment.Mu.Lock()
+	defer comment.Mu.Unlock()
+
+	for id, aiComment := range comment.AIComments {
 		up, down, err := github.FetchReactions(repo, id)
 		if err != nil {
 			fmt.Println("Could not fetch reactions:", err)

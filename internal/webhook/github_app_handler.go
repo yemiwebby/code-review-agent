@@ -8,27 +8,26 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/yemiwebby/code-review-agent/config"
 	"github.com/yemiwebby/code-review-agent/internal/github"
 	githubapp "github.com/yemiwebby/code-review-agent/internal/github/app"
-	"github.com/yemiwebby/code-review-agent/internal/openai"
+	"github.com/yemiwebby/code-review-agent/internal/reviewer"
 	githubhelper "github.com/yemiwebby/code-review-agent/internal/utils/githubHelper"
 )
 
-type PullRequestPayload struct {
-	Action      string `json:"action"`
-	PullRequest struct {
-		Number int `json:"number"`
-	} `json:"pull_request"`
-	Repository struct {
-		FullName string `json:"full_name"`
-		Owner    struct {
-			Login string `json:"login"`
-		} `json:"owner"`
-	} `json:"repository"`
-}
+// type PullRequestPayload struct {
+// 	Action      string `json:"action"`
+// 	PullRequest struct {
+// 		Number int `json:"number"`
+// 	} `json:"pull_request"`
+// 	Repository struct {
+// 		FullName string `json:"full_name"`
+// 		Owner    struct {
+// 			Login string `json:"login"`
+// 		} `json:"owner"`
+// 	} `json:"repository"`
+// }
 
 func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Received GitHub App webhook")
@@ -81,9 +80,7 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	owner := payload.Repository.Owner.Login
-	repo := payload.Repository.FullName
-
-	extractedRepo, err := githubhelper.ExtractRepoName(owner, repo)
+	repo, err := githubhelper.ExtractRepoName(owner, payload.Repository.FullName)
 	if err != nil {
 		log.Fatalf("Failed to extract repo name: %v", err)
 	}
@@ -91,7 +88,7 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 	prNumber := payload.PullRequest.Number
 
 	// Log the extracted PR info
-	log.Printf("Extracted PR info: owner=%s, extractedRepo=%s, prNumber=%d", owner, extractedRepo, prNumber)
+	log.Printf("Extracted PR info: owner=%s, extractedRepo=%s, prNumber=%d", owner, repo, prNumber)
 
 	// Authenticate with GitHub
 	authenticator, err := github.NewAppAuthenticator(config.GithubAppId)
@@ -109,35 +106,16 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Review the PR using AI
-	log.Printf("Strting AI review for PR #%d in %s", prNumber, repo)
+	log.Printf("Starting AI review for PR #%d in %s/%s", prNumber, owner, repo)
 	client := githubapp.NewGitHubAppClient(token)
-	files, err := github.GetPRFiles(owner, extractedRepo, prNumber)
+
+	commitID, err := github.GetCommitID(owner, repo, payload.PullRequest.Number, token, false)
 	if err != nil {
-		log.Printf("Failed to fetch PR files: %v", err)
-		http.Error(w, "Failed to fetch PR files", http.StatusInternalServerError)
+		log.Printf("failed to get commit ID: %v", err)
 		return
 	}
 
-	for _, file := range files {
-		if file.Patch == "" || !strings.HasSuffix(file.Filename, ".go") {
-			log.Printf("Skipping non-Go file or empty patch: %s", file.Filename)
-			continue
-		}
-
-		review, err := openai.AnalyzeCode(file.Patch)
-		if err != nil {
-			log.Printf("AI review failed for %s: %v", file.Filename, err)
-			continue
-		}
-
-		comment := fmt.Sprintf("**File:** %s\n\n%s\n\n", file.Filename, review)
-		log.Printf("Posting comment: %s", comment)
-
-		err = client.PostReviewComment(owner, extractedRepo, prNumber, comment, file.Filename, 0, file.Patch)
-		if err != nil {
-			log.Printf("Failed to post comment for %s: %v", file.Filename, err)
-		}
-	}
+	go reviewer.ReviewPullRequest(owner, repo, prNumber, commitID, client)
 
 	log.Println("AI review completed")
 	w.WriteHeader(http.StatusOK)
