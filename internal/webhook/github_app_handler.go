@@ -8,9 +8,13 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/yemiwebby/code-review-agent/config"
 	"github.com/yemiwebby/code-review-agent/internal/github"
+	githubapp "github.com/yemiwebby/code-review-agent/internal/github/app"
+	"github.com/yemiwebby/code-review-agent/internal/openai"
+	githubhelper "github.com/yemiwebby/code-review-agent/internal/utils/githubHelper"
 )
 
 type PullRequestPayload struct {
@@ -78,15 +82,16 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 
 	owner := payload.Repository.Owner.Login
 	repo := payload.Repository.FullName
-	prNumber := payload.PullRequest.Number
 
-	// extract the actual repo name (without the owner prefix)
-	if slashIndex := len(owner) + 1; slashIndex < len(repo) && repo[slashIndex-1] == '/' {
-		repo = repo[slashIndex:]
+	extractedRepo, err := githubhelper.ExtractRepoName(owner, repo)
+	if err != nil {
+		log.Fatalf("Failed to extract repo name: %v", err)
 	}
 
+	prNumber := payload.PullRequest.Number
+
 	// Log the extracted PR info
-	log.Printf("Extracted PR info: owner=%s, repo=%s, prNumber=%d", owner, repo, prNumber)
+	log.Printf("Extracted PR info: owner=%s, extractedRepo=%s, prNumber=%d", owner, extractedRepo, prNumber)
 
 	// Authenticate with GitHub
 	authenticator, err := github.NewAppAuthenticator(config.GithubAppId)
@@ -103,19 +108,38 @@ func GithubAppHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Post a dynamic comment to the PR
-	client := github.NewGitHubClient(token)
-	comment := fmt.Sprintf("Hello from your GitHub App! (PR #%d in %s)", prNumber, repo)
-	log.Printf("Posting comment: %s", comment)
-
-	err = client.PostComment(owner, repo, prNumber, comment)
+	// Review the PR using AI
+	log.Printf("Strting AI review for PR #%d in %s", prNumber, repo)
+	client := githubapp.NewGitHubAppClient(token)
+	files, err := github.GetPRFiles(owner, extractedRepo, prNumber)
 	if err != nil {
-		log.Printf("Error posting comment: %v", err)
-		http.Error(w, "Failed to post comment", http.StatusInternalServerError)
+		log.Printf("Failed to fetch PR files: %v", err)
+		http.Error(w, "Failed to fetch PR files", http.StatusInternalServerError)
 		return
 	}
 
+	for _, file := range files {
+		if file.Patch == "" || !strings.HasSuffix(file.Filename, ".go") {
+			log.Printf("Skipping non-Go file or empty patch: %s", file.Filename)
+			continue
+		}
+
+		review, err := openai.AnalyzeCode(file.Patch)
+		if err != nil {
+			log.Printf("AI review failed for %s: %v", file.Filename, err)
+			continue
+		}
+
+		comment := fmt.Sprintf("**File:** %s\n\n%s\n\n", file.Filename, review)
+		log.Printf("Posting comment: %s", comment)
+
+		err = client.PostReviewComment(owner, extractedRepo, prNumber, comment, file.Filename, 0, file.Patch)
+		if err != nil {
+			log.Printf("Failed to post comment for %s: %v", file.Filename, err)
+		}
+	}
+
+	log.Println("AI review completed")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, "Comment posted successfully")
-	log.Println("Comment posted successfully")
+	fmt.Fprintln(w, "AI review completed")
 }

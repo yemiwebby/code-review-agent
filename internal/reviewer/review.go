@@ -5,23 +5,24 @@ import (
 	"strings"
 
 	"github.com/yemiwebby/code-review-agent/internal/github"
+	"github.com/yemiwebby/code-review-agent/internal/github/directwebhook"
 	"github.com/yemiwebby/code-review-agent/internal/openai"
 )
 
-func ReviewPullRequest(repo string, prNumber int) {
-	fmt.Printf("Reviewing PR #%d in %s\n", prNumber, repo)
+func ReviewPullRequest(owner, repo string, prNumber int) {
+	fmt.Printf("Reviewing PR #%d in %s'/'%s\n", prNumber, owner, repo)
 
-	files, err := github.GetPRFiles(repo, prNumber)
+	files, err := github.GetPRFiles(owner, repo, prNumber)
 	if err != nil {
 		fmt.Println("Failed to fetch PR files:", err)
 		return
 	}
 
-	analyzeAndPostComments(files, repo, prNumber)
-	processCommentReactions(repo, prNumber)
+	analyzeAndPostComments(files, owner, repo, prNumber)
+	processCommentReactions(owner, repo, prNumber)
 }
 
-func analyzeAndPostComments(files []github.FileChange, repo string, prNumber int) {
+func analyzeAndPostComments(files []github.FileChange, owner, repo string, prNumber int) {
 	for _, file := range files {
 		if file.Patch == "" {
 			continue
@@ -39,18 +40,19 @@ func analyzeAndPostComments(files []github.FileChange, repo string, prNumber int
 		}
 
 		comment := fmt.Sprintf("**File:** %s:\n%s\n\n", file.Filename, review)
-		err = github.PostReviewComment(repo, prNumber, comment, file.Filename, 0, file.Patch)
+
+		err = directwebhook.PostReviewComment(owner, repo, prNumber, comment, file.Filename, 0, file.Patch)
 		if err != nil {
 			fmt.Println("Failed to post comment:", err)
 		}
 	}
 }
 
-func processCommentReactions(repo string, prNumber int) {
-	github.Mu.Lock()
-	defer github.Mu.Unlock()
+func processCommentReactions(owner, repo string, prNumber int) {
+	directwebhook.Mu.Lock()
+	defer directwebhook.Mu.Unlock()
 
-	for id, aiComment := range github.AIComments {
+	for id, aiComment := range directwebhook.AIComments {
 		up, down, err := github.FetchReactions(repo, id)
 		if err != nil {
 			fmt.Println("Could not fetch reactions:", err)
@@ -67,7 +69,7 @@ func processCommentReactions(repo string, prNumber int) {
 			continue
 		}
 
-		changed := hasCodeChanged(repo, prNumber, aiComment.File, aiComment.OldPatch)
+		changed := hasCodeChanged(owner, repo, prNumber, aiComment.File, aiComment.OldPatch)
 
 		if !changed {
 			fmt.Printf("Code hasn't changed since AI comment for file: %s\n", aiComment.File)
@@ -81,8 +83,8 @@ func processCommentReactions(repo string, prNumber int) {
 
 }
 
-func hasCodeChanged(repo string, prNumber int, filename, oldPatch string) bool {
-	currentFiles, err := github.GetPRFiles(repo, prNumber)
+func hasCodeChanged(owner, repo string, prNumber int, filename, oldPatch string) bool {
+	currentFiles, err := github.GetPRFiles(owner, repo, prNumber)
 	if err != nil {
 		fmt.Println("Failed to fetch latest PR files:", err)
 		return false

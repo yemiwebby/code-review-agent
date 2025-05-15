@@ -16,8 +16,8 @@ type FileChange struct {
 
 var GitHubBaseURL = "https://api.github.com"
 
-func GetPRFiles(repo string, prNumber int) ([]FileChange, error) {
-	url := fmt.Sprintf("%s/repos/%s/pulls/%d/files", GitHubBaseURL, repo, prNumber)
+func GetPRFiles(owner, repo string, prNumber int) ([]FileChange, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/pulls/%d/files", GitHubBaseURL, owner, repo, prNumber)
 
 	req, _ := http.NewRequest(http.MethodGet, url, nil)
 	req.Header.Set("Authorization", "token "+config.GithubToken)

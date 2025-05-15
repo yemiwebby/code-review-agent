@@ -1,4 +1,4 @@
-package github
+package directwebhook
 
 import (
 	"bytes"
@@ -27,9 +27,8 @@ type AIComment struct {
 	OldPatch  string
 }
 
-func PostReviewComment(repo string, prNumber int, body, file string, line int, patch string) error {
-
-	url := fmt.Sprintf("https://api.github.com/repos/%s/issues/%d/comments", repo, prNumber)
+func PostReviewComment(owner, repo string, prNumber int, body, file string, line int, patch string) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", owner, repo, prNumber)
 	payload, _ := json.Marshal(map[string]string{"body": body})
 
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
@@ -39,11 +38,18 @@ func PostReviewComment(repo string, prNumber int, body, file string, line int, p
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("failed to post comment, status code: %d, response: %s", resp.StatusCode, respBody)
+	}
 
 	var result struct {
 		ID int `json:"id"`
@@ -62,5 +68,6 @@ func PostReviewComment(repo string, prNumber int, body, file string, line int, p
 		OldPatch:  patch,
 	}
 
+	fmt.Printf("Posted review comment for %s: %s (ID: %d)\n", file, body, result.ID)
 	return nil
 }

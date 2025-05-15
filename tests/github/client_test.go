@@ -46,7 +46,7 @@ func TestGetPRFiles(t *testing.T) {
 	}()
 
 	// Act
-	files, err := github.GetPRFiles("any/repo", 1)
+	files, err := github.GetPRFiles("any", "repo", 1)
 
 	// Assert
 	if err != nil {

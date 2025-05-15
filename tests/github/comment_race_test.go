@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/yemiwebby/code-review-agent/internal/github"
+	"github.com/yemiwebby/code-review-agent/internal/github/directwebhook"
 )
 
 func TestPostReviewCommentRace(t *testing.T) {
@@ -18,14 +18,15 @@ func TestPostReviewCommentRace(t *testing.T) {
 	for i := 0; i < concurrency; i++ {
 		go func(i int) {
 			defer wg.Done()
-			repo := "dummy/repo"
+			owner := "dummy"
+			repo := "repo"
 			pr := 1
 			comment := "simualted AI comment"
 			file := "file"
 			line := 2
 			oldPatch := "old Patch"
 
-			github.PostReviewComment(repo, pr, comment, file, line, oldPatch)
+			directwebhook.PostReviewComment(owner, repo, pr, comment, file, line, oldPatch)
 		}(i)
 	}
 

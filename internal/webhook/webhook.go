@@ -3,9 +3,11 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/yemiwebby/code-review-agent/internal/reviewer"
+	githubhelper "github.com/yemiwebby/code-review-agent/internal/utils/githubHelper"
 )
 
 type PullRequest struct {
@@ -41,7 +43,11 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if event.Action == "opened" || event.Action == "synchronize" {
-		go reviewer.ReviewPullRequest(event.Repository.FullName, event.PullRequest.Number)
+		owner, repo, err := githubhelper.SplitRepoName(event.Repository.FullName)
+		if err != nil {
+			log.Fatalf("Failed to extract repo name: %v", err)
+		}
+		go reviewer.ReviewPullRequest(owner, repo, event.PullRequest.Number)
 	}
 
 	w.WriteHeader(http.StatusOK)
