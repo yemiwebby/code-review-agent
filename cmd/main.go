@@ -20,7 +20,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "AI PR Review Agent is running")
+		fmt.Fprintf(w, "AI PR Review Agent is running now")
 	})
 	mux.HandleFunc("/webhook", webhook.Handle)
 	mux.HandleFunc("/github-app", webhook.GithubAppHandler)
