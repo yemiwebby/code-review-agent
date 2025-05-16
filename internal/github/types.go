@@ -5,3 +5,7 @@ type FileChange struct {
 	Filename string `json:"filename"`
 	Patch    string `json:"patch"`
 }
+
+type Reactions struct {
+	Content string `json:"content"`
+}

@@ -9,7 +9,7 @@ import (
 	"github.com/yemiwebby/code-review-agent/config"
 )
 
-type Reactions struct {
+type reactions struct {
 	Content string `json:"content"`
 }
 
@@ -33,7 +33,7 @@ func FetchReactions(repo string, commentID int) (int, int, error) {
 		return 0, 0, fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var reactions []Reactions
+	var reactions []reactions
 	if err := json.Unmarshal(body, &reactions); err != nil {
 		fmt.Println("⚠️ Raw GitHub response (unexpected structure):", string(body)) // Debugging aid
 		return 0, 0, fmt.Errorf("failed to decode reactions JSON: %w", err)

@@ -3,6 +3,7 @@ package reviewer
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/yemiwebby/code-review-agent/internal/comment"
 	"github.com/yemiwebby/code-review-agent/internal/github"
@@ -14,72 +15,99 @@ func ReviewPullRequest(owner, repo string, prNumber int, commitID string, client
 
 	files, err := github.GetPRFiles(owner, repo, prNumber)
 	if err != nil {
-		fmt.Println("Failed to fetch PR files:", err)
+		fmt.Printf("Failed to fetch PR files for %s/%s: %s\n", owner, repo, err)
 		return
 	}
 
-	analyzeAndPostComments(files, owner, repo, prNumber, commitID, client)
-	processCommentReactions(owner, repo, prNumber)
-}
+	var wg sync.WaitGroup
+	wg.Add(len(files))
 
-func analyzeAndPostComments(files []github.FileChange, owner, repo string, prNumber int, commitID string, client github.GithubClientInterface) {
 	for _, file := range files {
-		if file.Patch == "" {
-			continue
-		}
-
-		if !strings.HasSuffix(file.Filename, ".go") {
-			fmt.Printf("Skipping non-Go file: %s\n", file.Filename)
-			continue
-		}
-
-		review, err := openai.AnalyzeCode(file.Patch)
-		if err != nil {
-			fmt.Println("AI Review failed:", err)
-			continue
-		}
-
-		comment := fmt.Sprintf("**File:** %s:\n%s\n\n", file.Filename, review)
-
-		err = client.PostReviewComment(owner, repo, prNumber, comment, file.Filename, commitID, 1, file.Patch)
-		if err != nil {
-			fmt.Println("Failed to post comment:", err)
-		}
+		go func(file github.FileChange) {
+			defer wg.Done()
+			processFileChange(file, owner, repo, prNumber, commitID, client)
+		}(file)
 	}
+
+	wg.Wait()
+
+	// analyzeAndPostComments(files, owner, repo, prNumber, commitID, client)
+	processCommentReactions(owner, repo, prNumber, client)
+
+	fmt.Println("Review completed for all files")
 }
 
-func processCommentReactions(owner, repo string, prNumber int) {
+func processFileChange(file github.FileChange, owner, repo string, prNumber int, commitID string, client github.GithubClientInterface) {
+	if file.Patch == "" {
+		fmt.Printf("Skipping file without patch: %s\n", file.Filename)
+		return
+	}
 
+	if !strings.HasSuffix(file.Filename, ".go") {
+		fmt.Printf("Skipping non-Go file: %s\n", file.Filename)
+		return
+	}
+
+	review, err := openai.AnalyzeCode(file.Patch)
+	if err != nil {
+		fmt.Printf("AI Review failed for %s: %s\n", file.Filename, err)
+		return
+	}
+
+	position, err := extractLinePosition(file.Patch)
+	if err != nil {
+		fmt.Printf("Failed to extract line positio for %s: %s\n", file.Filename, err)
+		return
+	}
+
+	commentBody := fmt.Sprintf("**File:** %s:\n%s\n\n", file.Filename, review)
+
+	commentID, err := client.PostReviewComment(owner, repo, prNumber, commentBody, file.Filename, commitID, position, file.Patch)
+	if err != nil {
+		fmt.Printf("Failed to post comment for %s: %s\n", file.Filename, err)
+		return
+	}
+
+	comment.StoreComment(commentID, commentBody, file.Filename, position, file.Patch)
+	fmt.Printf("Posted review comment for %s (commit ID: %s)\n", file.Filename, commitID)
+}
+
+func processCommentReactions(owner, repo string, prNumber int, client github.GithubClientInterface) {
 	comment.Mu.Lock()
 	defer comment.Mu.Unlock()
 
 	for id, aiComment := range comment.AIComments {
-		up, down, err := github.FetchReactions(repo, id)
+
+		if aiComment.File == "" || aiComment.OldPatch == "" {
+			fmt.Printf("Skipping comment %d due to missing metadata (file: %s, patch: %s)\n", id, aiComment.File, aiComment.OldPatch)
+			continue
+		}
+
+		up, down, err := client.FetchReactions(owner, repo, id)
 		if err != nil {
-			fmt.Println("Could not fetch reactions:", err)
+			fmt.Printf("Could not fetch reactions for comment %d: %s\n", id, err)
 			continue
 		}
 
 		if up == 0 && down == 0 {
-			fmt.Println("No reactions yet, skipping prompt adjustment.")
+			fmt.Printf("No reactions yet for comment %d, skipping prompt adjustment.\n", id)
 			continue
 		}
 
 		if aiComment.OldPatch == "" {
-			fmt.Printf("No patch found for comment %d\n", id)
+			fmt.Printf("No patch found for comment %d, skipping code change check.\n", id)
 			continue
 		}
 
-		changed := hasCodeChanged(owner, repo, prNumber, aiComment.File, aiComment.OldPatch)
-
-		if !changed {
-			fmt.Printf("Code hasn't changed since AI comment for file: %s\n", aiComment.File)
-		} else {
-			fmt.Printf("Code changed for: %s\n", aiComment.File)
+		if !hasCodeChanged(owner, repo, prNumber, aiComment.File, aiComment.OldPatch) {
+			fmt.Printf("Code hasn't changed since AI comment for file: %s (ID: %d)\n", aiComment.File, id)
+			continue
 		}
 
+		fmt.Printf("Code changed for: %s (ID: %d)\n", aiComment.File, id)
+
 		adjusted := openai.AdjustPrompt(aiComment.Body, up, down)
-		fmt.Println("Adjusted prompt:\n", adjusted)
+		fmt.Printf("Adjusted prompt for comment %d:\n%s\n", id, adjusted)
 	}
 
 }
@@ -87,7 +115,7 @@ func processCommentReactions(owner, repo string, prNumber int) {
 func hasCodeChanged(owner, repo string, prNumber int, filename, oldPatch string) bool {
 	currentFiles, err := github.GetPRFiles(owner, repo, prNumber)
 	if err != nil {
-		fmt.Println("Failed to fetch latest PR files:", err)
+		fmt.Printf("Failed to fetch latest PR files for %s/%s: %s\n", owner, repo, err)
 		return false
 	}
 
@@ -97,4 +125,15 @@ func hasCodeChanged(owner, repo string, prNumber int, filename, oldPatch string)
 		}
 	}
 	return false
+}
+
+func extractLinePosition(patch string) (int, error) {
+	lines := strings.Split(patch, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "++") {
+			return i + 1, nil
+		}
+	}
+
+	return 1, nil
 }
