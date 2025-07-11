@@ -30,7 +30,7 @@ func TestPostReviewCommentRace(t *testing.T) {
 			line := 2
 			oldPatch := "old Patch"
 
-			err := client.PostReviewComment(owner, repo, pr, comment, file, "", line, oldPatch)
+			_, err := client.PostReviewComment(owner, repo, pr, comment, file, "", line, oldPatch)
 			if err != nil {
 				t.Errorf("Failed to post review comment: %v", err)
 			}

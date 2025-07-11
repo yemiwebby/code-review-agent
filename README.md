@@ -1,22 +1,22 @@
-# 🤖 AI Code Review Agent for Pull Requests
+# AI Code Review Agent for Pull Requests
 
 An open source AI powered code review agent built with Go, integrated with GitHub and designed to work with any CI/CD system. It automatically reviews `.go` files in pull requests using OpenAI, posts contextual comments, and enforces that each comment is acknowledged before merging.
 
 Let the bots do the reviewing — so you can focus on writing great code.
 
-## ✨ Features
+## Features
 
-- 🔍 Reviews .go files in pull requests using OpenAI
+- Reviews .go files in pull requests using OpenAI
 
-- 💬 Posts summaries, suggestions, and praise directly on PRs
+- Posts summaries, suggestions, and praise directly on PRs
 
-- ✅ Enforces reactions (👍 or 👎) and optional code updates before merge
+- Enforces reactions (👍 or 👎) and optional code updates before merge
 
-- 🔒 Blocks unreviewed pull requests through CI integration
+- Blocks unreviewed pull requests through CI integration
 
-- ⚙️ Lightweight, extensible, and CI/CD agnostic
+- Lightweight, extensible, and CI/CD agnostic
 
-## 📦 Getting Started
+## Getting Started
 
 ### Clone the repository
 
@@ -46,7 +46,7 @@ go run cmd/main.go
 
 The agent starts on port 8080.
 
-## 🌐 Expose the Agent (Ngrok or Hosting)
+## Expose the Agent (Ngrok or Hosting)
 
 To receive webhook events from GitHub, expose your local server using Ngrok:
 
@@ -58,7 +58,7 @@ Copy the public URL — you’ll use it for the GitHub webhook and your CI syste
 
 You can also deploy the agent to your preferred hosting environment or container platform.
 
-## 🔁 Add a GitHub Webhook
+## Add a GitHub Webhook
 
 In your GitHub repository:
 
@@ -72,7 +72,7 @@ In your GitHub repository:
 
   - Event: Pull request
 
-## 🧪 Integrate with Your CI/CD Pipeline
+## Integrate with Your CI/CD Pipeline
 
 To block unreviewed pull requests, connect your CI/CD pipeline to the agent's /check-reactions endpoint.
 
@@ -94,13 +94,13 @@ Add these environment variables in your CI environment:
 
 You can replicate this check in GitHub Actions, GitLab CI, or any other system that supports HTTP calls.
 
-## 🧠 Prompt Configuration
+## Prompt Configuration
 
 Want to change how the agent reviews code or switch to a different language?
 
 [Edit the prompt logic here](https://github.com/yemiwebby/code-review-agent/blob/main/internal/openai/client.go)
 
-## 💡 How It Works
+## How It Works
 
 - PR is opened
 
@@ -112,7 +112,7 @@ Want to change how the agent reviews code or switch to a different language?
 
 - If all good, merge is unblocked
 
-## 🔧 Extend the Agent
+## Extend the Agent
 
 Ideas for extending this project:
 
@@ -124,18 +124,18 @@ Ideas for extending this project:
 
 - Turn it into a GitHub App
 
-## 🤝 Contributing
+## Contributing
 
 This is an open source project — contributions are welcome! Whether you're fixing bugs, adding features, or tweaking the review prompt, feel free to open a PR.
 
 If you find it useful:
 
-- ⭐ Star the repo
+- Star the repo
 
-- 🔁 Share it with your team
+- Share it with your team
 
-- 👤 Follow [@yemiwebby](https://www.linkedin.com/in/yemiwebby/) for updates
+- Follow [@yemiwebby](https://www.linkedin.com/in/yemiwebby/) for updates
 
-## 📄 License
+## License
 
 MIT © [yemiwebby](https://www.linkedin.com/in/yemiwebby/)
